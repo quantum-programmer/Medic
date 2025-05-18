@@ -7,11 +7,11 @@ uses
 
 type
   IPatientRepository = interface
-    ['{3B8B0E3F-5A1F-4D7A-9C3D-2F7E1A4B6C9D}']
-    function GetAll: TArray<TPatient>;
-    function GetById(Id: Integer): TPatient;
-    procedure AddOrUpdate(Patient: TPatient);
-    procedure Delete(Id: Integer);
+    ['{A3B5E7D9-F2E1-4C8B-9D9F-6A1C3B5E7D9F}']
+    function GetAllPatients: TArray<TPatient>;
+    function GetPatientById(Id: Integer): TPatient;
+    procedure SavePatient(Patient: TPatient);
+    procedure DeletePatient(Id: Integer);
   end;
 
 implementation

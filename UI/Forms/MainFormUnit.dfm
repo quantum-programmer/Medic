@@ -1,4 +1,4 @@
-object MainF: TMainForm
+object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = #1052#1077#1076#1080#1094#1080#1085#1089#1082#1080#1077' '#1082#1072#1088#1090#1099
@@ -30,10 +30,6 @@ object MainF: TMainForm
     object tsPatientsList: TcxTabSheet
       Caption = #1057#1087#1080#1089#1086#1082' '#1087#1072#1094#1080#1077#1085#1090#1086#1074
       ImageIndex = 0
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object pnlControls: TPanel
         Left = 0
         Top = 0
@@ -43,7 +39,7 @@ object MainF: TMainForm
         TabOrder = 0
         object btnAdd: TButton
           Left = 8
-          Top = 8
+          Top = 10
           Width = 75
           Height = 25
           Caption = #1044#1086#1073#1072#1074#1080#1090#1100

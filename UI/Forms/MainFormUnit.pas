@@ -1,4 +1,4 @@
-﻿unit MainForm;
+﻿unit MainFormUnit;
 
 interface
 
@@ -33,14 +33,14 @@ type
   private
     FPatientService: IPatientService;
     procedure LoadPatients(const Filter: string = '');
-    procedure OpenPatientCard(PatientId: Integer);
+    procedure OpenPatientCard(Patient: TPatient; IsNewPatient: Boolean = False);
     function GetSelectedPatientId: Integer;
   public
     constructor Create(AOwner: TComponent); override;
   end;
 
 var
-  MainF: TMainForm;
+  MainForm: TMainForm;
 
 implementation
 
@@ -52,42 +52,70 @@ uses
 constructor TMainForm.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  FPatientService := PatientService;
+  FPatientService := DependencyInjection.PatientService;
 end;
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
-  // Настройка грида
-  cxGridDBTableView.CreateColumn;
-  cxGridDBTableView.Columns[0].Caption := 'ID';
-  cxGridDBTableView.Columns[0].DataBinding.ValueType := 'Integer';
-  cxGridDBTableView.Columns[0].Width := 50;
+  // Настройка колонок грида
+  with cxGridDBTableView do
+  begin
+    ClearItems;
 
-  cxGridDBTableView.CreateColumn;
-  cxGridDBTableView.Columns[1].Caption := 'ФИО';
-  cxGridDBTableView.Columns[1].Width := 200;
+    // Колонка ID
+    CreateColumn;
+    Columns[0].Caption := 'ID';
+    Columns[0].DataBinding.ValueType := 'Integer';
+    Columns[0].Width := 50;
 
+    // Колонка ФИО
+    CreateColumn;
+    Columns[1].Caption := 'ФИО пациента';
+    Columns[1].DataBinding.ValueType := 'String';
+    Columns[1].Width := 250;
+
+    // Включаем сортировку
+    OptionsCustomize.ColumnSorting := True;
+    OptionsView.HeaderAutoHeight := True;
+    OptionsView.HeaderHeight := 25;
+  end;
+
+  // Загружаем данные
   LoadPatients;
 end;
 
-procedure TMainForm.LoadPatients(const Filter: string);
+procedure TMainForm.LoadPatients(const Filter: string = '');
 var
   Patients: TArray<TPatient>;
   Patient: TPatient;
 begin
-  Patients := FPatientService.GetAllPatients;
-  cxGridDBTableView.DataController.RecordCount := 0;
+  cxGridDBTableView.BeginUpdate;
+  try
+    cxGridDBTableView.DataController.RecordCount := 0;
+    Patients := FPatientService.GetAllPatients;
 
-  for Patient in Patients do
-  begin
-    if (Filter = '') or (Pos(LowerCase(Filter), LowerCase(Patient.Name)) > 0) then
+    for Patient in Patients do
     begin
-      cxGridDBTableView.DataController.AppendRecord;
-      cxGridDBTableView.DataController.Values[
-        cxGridDBTableView.DataController.RecordCount - 1, 0] := Patient.Id;
-      cxGridDBTableView.DataController.Values[
-        cxGridDBTableView.DataController.RecordCount - 1, 1] := Patient.Name;
+      // Сравниваем без учета регистра
+      if (Filter = '') or
+         (Pos(AnsiUpperCase(Filter), AnsiUpperCase(Patient.Name)) > 0) then
+      begin
+        cxGridDBTableView.DataController.AppendRecord;
+        cxGridDBTableView.DataController.Values[
+          cxGridDBTableView.DataController.RecordCount - 1, 0] := Patient.Id;
+        cxGridDBTableView.DataController.Values[
+          cxGridDBTableView.DataController.RecordCount - 1, 1] := Patient.Name;
+      end;
     end;
+
+    // Сортировка по ФИО по возрастанию
+    if cxGridDBTableView.ColumnCount > 1 then
+    begin
+      cxGridDBTableView.Columns[1].SortIndex := 0;
+      cxGridDBTableView.Columns[1].SortOrder := TcxDataSortOrder.soAscending;
+    end;
+  finally
+    cxGridDBTableView.EndUpdate;
   end;
 end;
 
@@ -100,35 +128,39 @@ begin
     Result := -1;
 end;
 
-procedure TMainForm.OpenPatientCard(PatientId: Integer);
+procedure TMainForm.OpenPatientCard(Patient: TPatient; IsNewPatient: Boolean);
 var
   Tab: TcxTabSheet;
   Frame: TPatientCardFrame;
-  Patient: TPatient;
 begin
-  Patient := FPatientService.GetPatientById(PatientId);
-  if Patient = nil then Exit;
-
-  // Создаем вкладку DevExpress
   Tab := TcxTabSheet.Create(cxPageControl);
-  Tab.Caption := Patient.Name;
-  Tab.PageControl := cxPageControl;
+  try
+    Tab.Caption := Patient.Name;
+    Tab.PageControl := cxPageControl;
 
-  // Создаем фрейм
-  Frame := TPatientCardFrame.Create(Tab);
-  Frame.Parent := Tab;
-  Frame.Align := alClient;
-  Frame.LoadPatient(Patient);
+    Frame := TPatientCardFrame.Create(Tab);
+    Frame.Parent := Tab;
+    Frame.Align := alClient;
+    Frame.LoadPatient(Patient);
 
-  Frame.OnSave := procedure
-  begin
-    FPatientService.SavePatient(Patient);
+    Frame.OnSave := procedure
+    begin
+      FPatientService.SavePatient(Patient);
+      LoadPatients(edtSearch.Text);
+      Tab.Free;
+    end;
+
+    Frame.OnCancel := procedure
+    begin
+      if IsNewPatient then
+        FPatientService.DeletePatient(Patient.Id);
+      Tab.Free;
+    end;
+
+    cxPageControl.ActivePage := Tab;
+  except
     Tab.Free;
-  end;
-
-  Frame.OnCancel := procedure
-  begin
-    Tab.Free;
+    raise;
   end;
 end;
 
@@ -138,8 +170,14 @@ var
 begin
   NewPatient := TPatient.Create;
   try
-    NewPatient.Id := Random(1000000);
-    OpenPatientCard(NewPatient.Id);
+    NewPatient.Id := FPatientService.GetNewPatientId;
+    NewPatient.Name := 'Новый пациент';
+    NewPatient.BirthDate := Now;
+    NewPatient.Gender := 'Мужской';
+    NewPatient.Phone := '';
+    NewPatient.Workplace := '';
+
+    OpenPatientCard(NewPatient, True);
   except
     NewPatient.Free;
     raise;
@@ -149,10 +187,15 @@ end;
 procedure TMainForm.btnEditClick(Sender: TObject);
 var
   PatientId: Integer;
+  Patient: TPatient;
 begin
   PatientId := GetSelectedPatientId;
   if PatientId > 0 then
-    OpenPatientCard(PatientId);
+  begin
+    Patient := FPatientService.GetPatientById(PatientId);
+    if Assigned(Patient) then
+      OpenPatientCard(Patient);
+  end;
 end;
 
 procedure TMainForm.btnDeleteClick(Sender: TObject);

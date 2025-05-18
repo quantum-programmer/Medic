@@ -3,47 +3,71 @@ unit PatientService;
 interface
 
 uses
-  IPatientServ,
-  IPatientRepo,
-  Patient;
+  Patient, IPatientServ, IPatientRepo, System.Generics.Collections;
 
 type
   TPatientService = class(TInterfacedObject, IPatientService)
   private
-    FRepository: IPatientRepository;
+    FPatientRepository: IPatientRepository;
   public
-    constructor Create(ARepository: IPatientRepository);
+    constructor Create(APatientRepository: IPatientRepository);
+
     function GetAllPatients: TArray<TPatient>;
     function GetPatientById(Id: Integer): TPatient;
     procedure SavePatient(Patient: TPatient);
     procedure DeletePatient(Id: Integer);
+    function GetNewPatientId: Integer;
   end;
 
 implementation
 
-constructor TPatientService.Create(ARepository: IPatientRepository);
+{ TPatientService }
+
+constructor TPatientService.Create(APatientRepository: IPatientRepository);
 begin
-  FRepository := ARepository;
+  inherited Create;
+  FPatientRepository := APatientRepository;
 end;
 
 function TPatientService.GetAllPatients: TArray<TPatient>;
 begin
-  Result := FRepository.GetAll;
+  Result := FPatientRepository.GetAllPatients;
 end;
 
 function TPatientService.GetPatientById(Id: Integer): TPatient;
 begin
-  Result := FRepository.GetById(Id);
+  Result := FPatientRepository.GetPatientById(Id);
 end;
 
 procedure TPatientService.SavePatient(Patient: TPatient);
 begin
-  FRepository.AddOrUpdate(Patient);
+  FPatientRepository.SavePatient(Patient);
 end;
 
 procedure TPatientService.DeletePatient(Id: Integer);
 begin
-  FRepository.Delete(Id);
+  FPatientRepository.DeletePatient(Id);
+end;
+
+function TPatientService.GetNewPatientId: Integer;
+var
+  Patients: TArray<TPatient>;
+  HighestId: Integer;
+  I: Integer;
+begin
+  Patients := GetAllPatients;
+
+  if Length(Patients) = 0 then
+    Exit(1);
+
+  HighestId := Patients[0].Id;
+  for I := 1 to High(Patients) do
+  begin
+    if Patients[I].Id > HighestId then
+      HighestId := Patients[I].Id;
+  end;
+
+  Result := HighestId + 1;
 end;
 
 end.

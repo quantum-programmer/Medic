@@ -104,19 +104,12 @@
         <DCCReference Include="Core\Repositories\IPatientRepo.pas"/>
         <DCCReference Include="Core\Services\IPatientServ.pas"/>
         <DCCReference Include="Infrastructure\Repositories\JsonPatientRepository.pas"/>
-        <DCCReference Include="Infrastructure\Logging\FileLogger.pas"/>
         <DCCReference Include="Application\Services\PatientService.pas"/>
-        <DCCReference Include="UI\Forms\MainForm.pas">
+        <DCCReference Include="UI\Forms\MainFormUnit.pas">
             <Form>MainForm</Form>
-        </DCCReference>
-        <DCCReference Include="UI\Forms\MainForm.dfm">
-            <ModuleName>MainForm.dfm</ModuleName>
         </DCCReference>
         <DCCReference Include="UI\Frames\PatientCardFrame.pas">
             <Form>PatientCardFrame</Form>
-        </DCCReference>
-        <DCCReference Include="UI\Frames\PatientCardFrame.dfm">
-            <ModuleName>PatientCardFrame.dfm</ModuleName>
         </DCCReference>
         <DCCReference Include="DependencyInjection.pas"/>
         <BuildConfiguration Include="Release">

@@ -1,16 +1,17 @@
 object PatientCardFrame: TPatientCardFrame
   Left = 0
   Top = 0
-  Width = 600
+  Width = 601
   Height = 400
   TabOrder = 0
   object pnlButtons: TPanel
     Left = 0
     Top = 359
-    Width = 600
+    Width = 601
     Height = 41
     Align = alBottom
     TabOrder = 0
+    ExplicitWidth = 600
     object btnSave: TButton
       Left = 400
       Top = 8
@@ -33,11 +34,12 @@ object PatientCardFrame: TPatientCardFrame
   object gbPatientInfo: TGroupBox
     Left = 0
     Top = 0
-    Width = 600
+    Width = 601
     Height = 359
     Align = alClient
     Caption = 'Patient Information'
     TabOrder = 1
+    ExplicitWidth = 600
     object lblName: TLabel
       Left = 16
       Top = 24

@@ -3,29 +3,21 @@ unit DependencyInjection;
 interface
 
 uses
-  IPatientServ,
-  PatientService,
-  IPatientRepo,
-  JsonPatientRepository,
-  FileLogger;
+  Patient, IPatientRepo, IPatientServ, JsonPatientRepository, PatientService;
 
 var
   PatientService: IPatientService;
-  Logger: ILogger;
 
-procedure InitializeDependencies;
+procedure RegisterServices;
 
 implementation
 
-procedure InitializeDependencies;
+procedure RegisterServices;
+var
+  PatientRepository: IPatientRepository;
 begin
-  Logger := TFileLogger.Create('app.log');
-  PatientService := TPatientService.Create(
-    TJsonPatientRepository.Create('patients.json')
-  );
+  PatientRepository := TJsonPatientRepository.Create;
+  PatientService := TPatientService.Create(PatientRepository);
 end;
-
-initialization
-  InitializeDependencies;
 
 end.

@@ -3,132 +3,168 @@ unit JsonPatientRepository;
 interface
 
 uses
-  System.JSON, System.IOUtils, System.SysUtils,
-  IPatientRepo, Patient;
+  System.IOUtils, System.JSON, System.Generics.Collections, System.SysUtils, // Добавлен System.SysUtils
+  Patient, IPatientRepo;
 
 type
   TJsonPatientRepository = class(TInterfacedObject, IPatientRepository)
   private
     FFilePath: string;
-    function PatientToJson(Patient: TPatient): TJSONObject;
-    function JsonToPatient(Json: TJSONObject): TPatient;
+    function LoadFromFile: TArray<TPatient>;
+    procedure SaveToFile(const Patients: TArray<TPatient>);
   public
-    constructor Create(const FilePath: string);
-    function GetAll: TArray<TPatient>;
-    function GetById(Id: Integer): TPatient;
-    procedure AddOrUpdate(Patient: TPatient);
-    procedure Delete(Id: Integer);
+    constructor Create;
+
+    function GetAllPatients: TArray<TPatient>;
+    function GetPatientById(Id: Integer): TPatient;
+    procedure SavePatient(Patient: TPatient);
+    procedure DeletePatient(Id: Integer);
   end;
 
 implementation
 
-constructor TJsonPatientRepository.Create(const FilePath: string);
+uses
+  System.DateUtils; // Добавлен для работы с датами
+
+{ TJsonPatientRepository }
+
+constructor TJsonPatientRepository.Create;
 begin
-  FFilePath := FilePath;
-  if not FileExists(FFilePath) then
-    TFile.WriteAllText(FFilePath, '[]');
+  inherited;
+  FFilePath := TPath.Combine(ExtractFilePath(ParamStr(0)), 'patients.json');
 end;
 
-function TJsonPatientRepository.PatientToJson(Patient: TPatient): TJSONObject;
+function TJsonPatientRepository.GetAllPatients: TArray<TPatient>;
 begin
-  Result := TJSONObject.Create;
-  Result.AddPair('id', TJSONNumber.Create(Patient.Id));
-  Result.AddPair('name', Patient.Name);
-  Result.AddPair('birthDate', FormatDateTime('yyyy-mm-dd', Patient.BirthDate));
-  Result.AddPair('gender', TJSONNumber.Create(Ord(Patient.Gender)));
-  Result.AddPair('phone', Patient.Phone);
-  Result.AddPair('workplace', Patient.Workplace);
+  Result := LoadFromFile;
 end;
 
-function TJsonPatientRepository.JsonToPatient(Json: TJSONObject): TPatient;
-begin
-  Result := TPatient.Create;
-  Result.Id := Json.GetValue<Integer>('id');
-  Result.Name := Json.GetValue<string>('name');
-  Result.BirthDate := StrToDate(Json.GetValue<string>('birthDate'));
-  Result.Gender := TGender(Json.GetValue<Integer>('gender'));
-  Result.Phone := Json.GetValue<string>('phone');
-  Result.Workplace := Json.GetValue<string>('workplace');
-end;
-
-function TJsonPatientRepository.GetAll: TArray<TPatient>;
-var
-  JsonArray: TJSONArray;
-  i: Integer;
-begin
-  JsonArray := TJSONObject.ParseJSONValue(TFile.ReadAllText(FFilePath)) as TJSONArray;
-  try
-    SetLength(Result, JsonArray.Count);
-    for i := 0 to JsonArray.Count - 1 do
-      Result[i] := JsonToPatient(JsonArray.Items[i] as TJSONObject);
-  finally
-    JsonArray.Free;
-  end;
-end;
-
-function TJsonPatientRepository.GetById(Id: Integer): TPatient;
+function TJsonPatientRepository.GetPatientById(Id: Integer): TPatient;
 var
   Patients: TArray<TPatient>;
   Patient: TPatient;
 begin
-  Patients := GetAll;
+  Patients := LoadFromFile;
   for Patient in Patients do
     if Patient.Id = Id then
       Exit(Patient);
   Result := nil;
 end;
 
-procedure TJsonPatientRepository.AddOrUpdate(Patient: TPatient);
+procedure TJsonPatientRepository.SavePatient(Patient: TPatient);
 var
   Patients, NewPatients: TArray<TPatient>;
-  i: Integer;
+  I: Integer;
   Found: Boolean;
-  JsonArray: TJSONArray;
 begin
-  Patients := GetAll;
+  Patients := LoadFromFile;
   Found := False;
-  for i := Low(Patients) to High(Patients) do
-    if Patients[i].Id = Patient.Id then
+
+  for I := 0 to High(Patients) do
+    if Patients[I].Id = Patient.Id then
     begin
-      Patients[i] := Patient;
+      Patients[I] := Patient;
       Found := True;
       Break;
     end;
 
   if not Found then
   begin
-    SetLength(Patients, Length(Patients) + 1);
-    Patients[High(Patients)] := Patient;
+    SetLength(NewPatients, Length(Patients) + 1);
+    for I := 0 to High(Patients) do
+      NewPatients[I] := Patients[I];
+    NewPatients[High(NewPatients)] := Patient;
+    Patients := NewPatients;
   end;
 
-  JsonArray := TJSONArray.Create;
+  SaveToFile(Patients);
+end;
+
+procedure TJsonPatientRepository.DeletePatient(Id: Integer);
+var
+  Patients, NewPatients: TArray<TPatient>;
+  I, J: Integer;
+begin
+  Patients := LoadFromFile;
+  SetLength(NewPatients, Length(Patients) - 1);
+  J := 0;
+
+  for I := 0 to High(Patients) do
+    if Patients[I].Id <> Id then
+    begin
+      if J <= High(NewPatients) then
+        NewPatients[J] := Patients[I];
+      Inc(J);
+    end;
+
+  SaveToFile(NewPatients);
+end;
+
+function TJsonPatientRepository.LoadFromFile: TArray<TPatient>;
+var
+  JsonArray: TJSONArray;
+  JsonObj: TJSONObject;
+  Patient: TPatient;
+  JsonString: string;
+  I: Integer;
+  DateStr: string;
+begin
+  if not TFile.Exists(FFilePath) then
+    Exit(nil);
+
+  JsonString := TFile.ReadAllText(FFilePath);
+  JsonArray := TJSONObject.ParseJSONValue(JsonString) as TJSONArray;
   try
-    for i := Low(Patients) to High(Patients) do
-      JsonArray.AddElement(PatientToJson(Patients[i]));
-    TFile.WriteAllText(FFilePath, JsonArray.ToJSON);
+    SetLength(Result, JsonArray.Count);
+    for I := 0 to JsonArray.Count - 1 do
+    begin
+      JsonObj := JsonArray.Items[I] as TJSONObject;
+      Patient := TPatient.Create;
+      Patient.Id := JsonObj.GetValue<Integer>('id');
+      Patient.Name := JsonObj.GetValue<string>('name');
+
+      // Исправленное чтение даты
+      DateStr := JsonObj.GetValue<string>('birthDate');
+      Patient.BirthDate := ISO8601ToDate(DateStr, False);
+
+      Patient.Gender := JsonObj.GetValue<string>('gender');
+      Patient.Phone := JsonObj.GetValue<string>('phone');
+      Patient.Workplace := JsonObj.GetValue<string>('workplace');
+      Result[I] := Patient;
+    end;
   finally
     JsonArray.Free;
   end;
 end;
 
-procedure TJsonPatientRepository.Delete(Id: Integer);
+procedure TJsonPatientRepository.SaveToFile(const Patients: TArray<TPatient>);
 var
-  Patients, NewPatients: TArray<TPatient>;
-  i, j: Integer;
+  JsonArray: TJSONArray;
+  JsonObj: TJSONObject;
+  I: Integer;
 begin
-  Patients := GetAll;
-  j := 0;
-  SetLength(NewPatients, Length(Patients));
-  for i := Low(Patients) to High(Patients) do
-    if Patients[i].Id <> Id then
+  JsonArray := TJSONArray.Create;
+  try
+    for I := 0 to High(Patients) do
     begin
-      NewPatients[j] := Patients[i];
-      Inc(j);
+      JsonObj := TJSONObject.Create;
+      JsonObj.AddPair('id', TJSONNumber.Create(Patients[I].Id));
+      JsonObj.AddPair('name', TJSONString.Create(Patients[I].Name));
+
+      // Исправленное сохранение даты
+      JsonObj.AddPair('birthDate',
+        TJSONString.Create(DateToISO8601(Patients[I].BirthDate, False)));
+
+      JsonObj.AddPair('gender', TJSONString.Create(Patients[I].Gender));
+      JsonObj.AddPair('phone', TJSONString.Create(Patients[I].Phone));
+      JsonObj.AddPair('workplace', TJSONString.Create(Patients[I].Workplace));
+      JsonArray.AddElement(JsonObj);
     end;
-  SetLength(NewPatients, j);
-  AddOrUpdate(nil); // Очищаем файл
-  for i := Low(NewPatients) to High(NewPatients) do
-    AddOrUpdate(NewPatients[i]);
+
+    TFile.WriteAllText(FFilePath, JsonArray.ToJSON);
+  finally
+    JsonArray.Free;
+  end;
 end;
 
 end.

@@ -12,6 +12,7 @@ type
     function GetPatientById(Id: Integer): TPatient;
     procedure SavePatient(Patient: TPatient);
     procedure DeletePatient(Id: Integer);
+    function GetNewPatientId: Integer;
   end;
 
 implementation
